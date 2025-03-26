@@ -108,3 +108,53 @@
         true
     ))
 )
+
+;; Validate percentage is within valid range
+(define-private (validate-percentage (percentage uint))
+    (and (>= percentage u0) (<= percentage BASIS-POINTS))
+)
+
+;; Validate sum of portfolio percentages equals 100%
+(define-private (validate-portfolio-percentages (percentages (list 10 uint)))
+    (let (
+        (total (fold + percentages u0))
+    )
+    (and
+        (is-eq total BASIS-POINTS)
+        (fold and
+            (map validate-percentage percentages)
+            true)
+    ))
+)
+
+;; Helper function for percentage validation
+(define-private (check-percentage-sum (current-percentage uint) (valid bool))
+    (and valid (validate-percentage current-percentage))
+)
+
+;;  Add portfolio ID to user's portfolio list
+(define-private (add-to-user-portfolios (user principal) (portfolio-id uint))
+    (let (
+        (current-portfolios (get-user-portfolios user))
+        (new-portfolios (unwrap! (as-max-len? (append current-portfolios portfolio-id) u20) ERR-USER-STORAGE-FAILED))
+    )
+    (map-set UserPortfolios user new-portfolios)
+    (ok true))
+)
+
+;; Initialize a new portfolio asset
+(define-private (initialize-portfolio-asset (index uint) (token principal) (percentage uint) (portfolio-id uint))
+    (if (>= percentage u0)
+        (begin
+            (map-set PortfolioAssets
+                {portfolio-id: portfolio-id, token-id: index}
+                {
+                    target-percentage: percentage,
+                    current-amount: u0,
+                    token-address: token
+                }
+            )
+            (ok true))
+        ERR-INVALID-TOKEN
+    )
+)
