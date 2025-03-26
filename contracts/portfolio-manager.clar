@@ -202,3 +202,51 @@
                     (- count u1)))
             (ok true)))
 )
+
+;; Public Functions
+
+;; Create a new portfolio with specified tokens and allocations
+(define-public (create-portfolio (initial-tokens (list 10 principal)) (percentages (list 10 uint)))
+    (let (
+        (portfolio-id (+ (var-get portfolio-counter) u1))
+        (token-count (len initial-tokens))
+        (percentage-count (len percentages))
+    )
+    (asserts! (<= token-count MAX-TOKENS-PER-PORTFOLIO) ERR-MAX-TOKENS-EXCEEDED)
+    (asserts! (is-eq token-count percentage-count) ERR-LENGTH-MISMATCH)
+    (asserts! (validate-portfolio-percentages percentages) ERR-INVALID-PERCENTAGE)
+    (asserts! (>= token-count u2) ERR-INVALID-PORTFOLIO)
+
+    (map-set Portfolios portfolio-id
+        {
+            owner: tx-sender,
+            created-at: block-height,
+            last-rebalanced: block-height,
+            total-value: u0,
+            active: true,
+            token-count: token-count
+        }
+    )
+
+    (try! (initialize-portfolio-asset
+        u0
+        (unwrap! (element-at initial-tokens u0) ERR-INVALID-TOKEN)
+        (unwrap! (element-at percentages u0) ERR-INVALID-PERCENTAGE)
+        portfolio-id))
+
+    (try! (initialize-portfolio-asset
+        u1
+        (unwrap! (element-at initial-tokens u1) ERR-INVALID-TOKEN)
+        (unwrap! (element-at percentages u1) ERR-INVALID-PERCENTAGE)
+        portfolio-id))
+
+    (let ((remaining-count (- token-count u2)))
+        (if (> remaining-count u0)
+            (try! (initialize-additional-tokens portfolio-id initial-tokens percentages u2 remaining-count))
+            (ok true)))
+
+    (try! (add-to-user-portfolios tx-sender portfolio-id))
+
+    (var-set portfolio-counter portfolio-id)
+    (ok portfolio-id))
+)
